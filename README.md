@@ -3,7 +3,7 @@
 ### 和 类 相关的 API
 
 #### 1. 传入一个对象, 获取其 `isa` 指向的 Class 对象.
-```objc
+```c++
 Class object_getClass(id obj)
 ```
 
@@ -22,7 +22,7 @@ NSLog(@"%p---%p",object_getClass([TYPerson class]), [TYPerson class]);
 
 #### 2.设置 `isa` 指向的 Class
 
-```objc
+```c++
 Class object_setClass(id obj, Class cls)
 ```
 
@@ -44,7 +44,7 @@ object_setClass(person, [TYAnimal class]);
 
 #### 3.判断一个 OC 对象是否是 Class 类型
 
-```objc
+```c++
 BOOL object_isClass(id obj)
 ```
 
@@ -69,7 +69,7 @@ object_isClass(object_getClass([TYPerson class])));
 
 #### 4. 动态创建一个类 
 
-```objc
+```c++
 /**
  * 参数1: superclass, 父类
  * 参数2: name, 类名
@@ -93,7 +93,7 @@ Class newClass = objc_allocateClassPair([NSObject class], "TYDog", 0);
 - 因为成员变量在 `class_ro_t` 这个结构体中,是只读的,所以不能为一个结构已经确定的类去动态的添加成员变量.
 - 但是方法、协议、属性等等是可以动态添加的,就是说动态添加方法可以在注册类后面再写,因为方法是在`class_rw_t`这个结构体中.
 
-```objc
+```c++
 objc_registerClassPair(Class *cls)
 ```
 
@@ -128,4 +128,135 @@ id dog = [[newClass alloc] init];
    
 NSLog(@"%@---%@",[dog valueForKey:@"_age"], [dog valueForKey:@"_weight"]);
 ```
+
+### 和 成员变量 有关的API
+
+#### 1.获取成员变量的相关信息
+
+```c++
+const char *ivar_getName(Ivar v)
+const char *ivar_getTypeEncoding(Ivar v)
+```
+
+如:
+
+`TYPerson` 有两个属性
+
+```objc
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, assign) int age;
+```
+
+执行如下方法,看其成员变量信息
+
+```c++
+// 获取成员变量信息
+Ivar nameIvar = class_getInstanceVariable([TYPerson class], "_name");
+Ivar ageIvar = class_getInstanceVariable([TYPerson class], "_age");
+NSLog(@"\n%s %s\n%s %s", ivar_getName(nameIvar), ivar_getTypeEncoding(nameIvar), ivar_getName(ageIvar), ivar_getTypeEncoding(ageIvar));
+```
+
+打印结果:
+
+```c
+_name @"NSString"
+_age i
+```
+#### 2.设置和获取成员变量的值
+
+```c++
+object_setIvar(id obj, Ivar ivar, id value)
+```
+
+如
+
+```objc
+TYPerson *person = [[TYPerson alloc] init];
+object_setIvar(person, nameIvar, @"mty");
+object_setIvar(person, ageIvar, @10);
+
+NSLog(@"\nname = %@\n age = %@",object_getIvar(person, nameIvar), object_getIvar(person, ageIvar));
+```
+
+打印结果:
+
+```c
+name = mty
+age = 10
+```
+
+#### 3.获取一个类里的所有成员变量.
+
+```c++
+class_copyIvarList(Class cls, int *outCount);
+```
+
+如:
+
+```objc
+// 获取所有的成员变量信息
+// 成员变量的数量
+unsigned int count;
+Ivar *ivars = class_copyIvarList([TYPerson class], &count);
+for (int i = 0; i<count; i++) {
+  // 取出 i 位置的成员变量
+  Ivar ivar = ivars[i];
+  NSLog(@"%s  %s", ivar_getName(ivar), ivar_getTypeEncoding(ivar));
+}
+// 释放
+free(ivars);
+```
+
+打印信息:
+
+```c
+_age  i
+_name  @"NSString"
+```
+
+这个方法,在 iOS 中很有用,举个例子, 修改`UITextField`的占位文字颜色.
+
+修改这个颜色,先举出最常用的办法:
+
+```objc
+// 方法一:
+// 一般正常改变 TextField 的占位文字颜色
+self.textField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入姓名:" attributes:@{NSForegroundColorAttributeName : [UIColor redColor]}];
+```
+
+下面是通过这个 runtime API 的方式去修改, 使用这个方法的前提,是我们要知道`UITextField`中的成员变量信息. 文字颜色很有可能和 `UILabel` 有关, 所以先看下其成员变量都有什么:
+
+```objc
+self.textField.placeholder = @"请输入姓名:";
+// 查看其所有的成员变量
+unsigned int count;
+Ivar *ivars = class_copyIvarList([UITextField class], &count);
+for (int i = 0; i < count; i++) {
+   Ivar ivar = ivars[i];
+   NSLog(@"%s %s",ivar_getName(ivar), ivar_getTypeEncoding(ivar));
+}
+```
+
+从上面的打印,可以获取到其中有个成员变量信息如下:
+
+```c
+_placeholderLabel @"UITextFieldLabel"
+```
+
+知道其成员变量,根据 `kvc` 取出这个类型,改变颜色
+
+```objc
+// 方法二:
+// 通过 kvc 根据成员变量取出这个 label
+UILabel *placeholderLabel = [self.textField valueForKeyPath:@"_placeholderLabel"];
+placeholderLabel.textColor = [UIColor blueColor];
+```
+
+另一个直接的方法
+
+```objc
+// 方法三:
+[self.textField setValue:[UIColor orangeColor] forKeyPath:@"_placeholderLabel.textColor"];
+```
+
 

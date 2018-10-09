@@ -31,26 +31,50 @@ int main(int argc, const char * argv[]) {
         
 //        NSLog(@"%d---%d----%d",object_isClass(person), object_isClass([TYPerson class]), object_isClass(object_getClass([TYPerson class])));
         
-        // 动态创建这个类
-        Class newClass = objc_allocateClassPair([NSObject class], "TYDog", 0);
+//        // 动态创建这个类
+//        Class newClass = objc_allocateClassPair([NSObject class], "TYDog", 0);
+//
+//        // 动态添加成员变量
+//        class_addIvar(newClass, "_age", 4, 1, @encode(int));
+//        class_addIvar(newClass, "_weight", 4, 1, @encode(int));
+//
+//        // 动态添加方法
+//        class_addMethod(newClass, @selector(run), (IMP)run, "v@:");
+//
+//        // 注册类
+//        objc_registerClassPair(newClass);
+//
+//        // 使用动态创建的这个类
+//        id dog = [[newClass alloc] init];
+//        [dog setValue:@10 forKey:@"_age"];
+//        [dog setValue:@30 forKey:@"_weight"];
+//        [dog run];
+//
+//        NSLog(@"%@---%@",[dog valueForKey:@"_age"], [dog valueForKey:@"_weight"]);
         
-        // 动态添加成员变量
-        class_addIvar(newClass, "_age", 4, 1, @encode(int));
-        class_addIvar(newClass, "_weight", 4, 1, @encode(int));
+        // 获取成员变量信息
+        Ivar nameIvar = class_getInstanceVariable([TYPerson class], "_name");
+        Ivar ageIvar = class_getInstanceVariable([TYPerson class], "_age");
+        NSLog(@"\n%s %s\n%s %s", ivar_getName(nameIvar), ivar_getTypeEncoding(nameIvar), ivar_getName(ageIvar), ivar_getTypeEncoding(ageIvar));
         
-        // 动态添加方法
-        class_addMethod(newClass, @selector(run), (IMP)run, "v@:");
+        object_setIvar(person, nameIvar, @"mty");
+        object_setIvar(person, ageIvar, @10);
         
-        // 注册类
-        objc_registerClassPair(newClass);
+        NSLog(@"\nname = %@\n age = %@",object_getIvar(person, nameIvar), object_getIvar(person, ageIvar));
         
-        // 使用动态创建的这个类
-        id dog = [[newClass alloc] init];
-        [dog setValue:@10 forKey:@"_age"];
-        [dog setValue:@30 forKey:@"_weight"];
-        [dog run];
         
-        NSLog(@"%@---%@",[dog valueForKey:@"_age"], [dog valueForKey:@"_weight"]);
+        
+        // 获取所有的成员变量信息
+        // 成员变量的数量
+        unsigned int count;
+        Ivar *ivars = class_copyIvarList([TYPerson class], &count);
+        for (int i = 0; i<count; i++) {
+            // 取出 i 位置的成员变量
+            Ivar ivar = ivars[i];
+            NSLog(@"%s  %s", ivar_getName(ivar), ivar_getTypeEncoding(ivar));
+        }
+        // 释放
+        free(ivars);
         
     }
     return 0;
