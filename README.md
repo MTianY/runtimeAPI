@@ -336,4 +336,75 @@ Method runMethod = class_getInstanceMethod([TYPerson class], @selector(run));
 method_exchangeImplementations(playMethod, runMethod);
 ```
 
+#### 2.交换方法实现简单示例
+
+> 想要监听一个项目中的所有按钮的点击情况.
+
+- `UIButton` 继承自 `UIControl`.
+- 真正处理点击事件的是 `UIControl` 中的这个方法:
+
+```objc
+- (void)sendAction:(SEL)action to:(nullable id)target forEvent:(nullable UIEvent *)event;
+```
+
+- 所以如果要监听到所有按钮的点击情况,我们要拦截这个方法.
+
+通过 `method_exchangeImplementations` 这个方法来将系统的方法实现和我们自己的方法实现来交换一下:
+
+首先创建一个 `UIControl` 的分类: `UIControl+Extension`.
+
+```objc
+#import "UIControl+Extension.h"
+#import <objc/runtime.h>
+
+@implementation UIControl (Extension)
+
++ (void)load {
+    
+    Method systemMethod = class_getInstanceMethod(self, @selector(sendAction:to:forEvent:));
+    Method myMethod = class_getInstanceMethod(self, @selector(ty_sendAction:to:forEvent:));
+    method_exchangeImplementations(systemMethod, myMethod);
+    
+}
+
+- (void)ty_sendAction:(SEL)action to:(id)target forEvent:(UIEvent *)event {
+    NSLog(@"监听按钮点击操作--%s",__func__);
+    
+    // 如果要执行 button 之前的点击操作,那么就要执行这个.来执行原来的方法.
+    [self ty_sendAction:action to:target forEvent:event];
+    
+}
+
+@end
+```
+
+##### 解析
+
+```objc
+void method_exchangeImplementations(Method m1, Method m2)
+{
+    if (!m1  ||  !m2) return;
+
+    rwlock_writer_t lock(runtimeLock);
+
+    IMP m1_imp = m1->imp;
+    m1->imp = m2->imp;
+    m2->imp = m1_imp;
+
+
+    // RR/AWZ updates are slow because class is unknown
+    // Cache updates are slow because class is unknown
+    // fixme build list of classes whose Methods are known externally?
+
+    // 清除缓存的操作.
+    flushCaches(nil);
+
+    updateCustomRR_AWZ(nil, m1);
+    updateCustomRR_AWZ(nil, m2);
+}
+```
+
+找到 method 中 方法的实现,然后将这两个方法的实现交换了位置.所以我们上边如果要调 UIButton 之前的点击操作,那么就要调用我们这个自己的方法,看似死循环,其实我们这个方法存的是系统的那个方法.
+
+
 
