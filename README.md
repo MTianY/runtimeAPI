@@ -259,4 +259,81 @@ placeholderLabel.textColor = [UIColor blueColor];
 [self.textField setValue:[UIColor orangeColor] forKeyPath:@"_placeholderLabel.textColor"];
 ```
 
+#### 4.一个简单的字典转模型例子.
+
+主要用到 runtime 的 `class_copyIvarList` 方法
+
+为`NSObject` 新建一个分类`NSObject+JSONModel`
+
+```objc
+// 定义接口
++ (instancetype)ty_objectWithJSON:(NSDictionary *)jsonDict;
+
+// 实现接口
+// 导入runtime
+#import <objc/runtime.h>
++ (instancetype)ty_objectWithJSON:(NSDictionary *)jsonDict {
+    NSObject *obj = [[self alloc] init];
+    unsigned int count;
+    // 取出当前类的所有成员变量
+    Ivar *ivars = class_copyIvarList(self, &count);
+    // 遍历成员变量
+    for(int i = 0; i < count; i++) {
+        Ivar ivar = ivars[i];
+        // 将 C 语言字符串转成 OC 字符串
+        NSMutableString *name = [NSMutableString stringWithUTF8String:ivar_getName(ivar)];
+        // 去掉成员变量的首个下划线
+        NSString *newName = [name substringFromIndex:1];
+        // 赋值
+        [obj setValue:jsonDict[newName] forKey:newName];
+    }
+    return obj;
+}
+```
+
+定义一个简单的模型
+
+```objc
+// TYTestModel.h
+@interface TYTestModel : NSObject
+@property (nonatomic, copy) NSString * name;
+@property (nonatomic, assign) int age;
+@property (nonatomic, assign) int no;
+@end
+```
+
+使用
+
+```objc
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    
+    NSDictionary *testJson = @{
+                               @"name" : @"ty",
+                               @"age" : @10,
+                               @"no" : @1388994
+                               };
+
+    TYTestModel *testModel = [TYTestModel ty_objectWithJSON:testJson];
+    NSLog(@"%@",testModel);
+    
+}
+```
+
+### 其他 API
+
+#### 1. 交换方法
+
+```objc
+method_exchangeImplementations(method_1, method_2)
+```
+
+```objc
+// 取出 TYPerson 中的对象方法 eat
+Method playMethod = class_getInstanceMethod([TYPerson class], @selector(eat));
+// 取出 TYPerson 中的对象方法 run
+Method runMethod = class_getInstanceMethod([TYPerson class], @selector(run));
+// 交换 eat 和 run 的方法实现
+method_exchangeImplementations(playMethod, runMethod);
+```
+
 
